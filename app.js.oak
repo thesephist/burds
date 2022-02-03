@@ -1,0 +1,361 @@
+// making this -> https://twitter.com/LoekVugs/status/1488140798671663104
+
+{
+	println: println
+	default: default
+	range: range
+	slice: slice
+	map: map
+	each: each
+	merge: merge
+	filter: filter
+	append: append
+} := import('std')
+math := import('math')
+sort := import('sort')
+random := import('random')
+
+// rendering configs
+DPI := window.devicePixelRatio |> default(1)
+// every measurement of distance or length is measured as a multiple of some
+// distance-adjusted scale, to allow for easily experimenting with burd size
+// and perspective. MaxScale sets the scaling multiplier at the "front" of the
+// scene.
+MaxScale := 5
+JumpDuration := 0.25 // seconds
+JumpHeight := 0.5
+JumpDistance := 12
+// To reduce visual clutter, we remove footprints that are old. On average,
+// each burd leaves FootprintTrail number of footprints before they are erased.
+FootprintTrail := 8
+// shorthand for convenient access
+DrawWidth := window.innerWidth
+DrawHeight := window.innerHeight
+
+// DOM bindings
+querySelector := bind(document, :querySelector)
+fn addHandler(el, name, handler) bind(el, :addEventListener)(string(name), handler)
+
+// Canvas bindings
+Canvas := querySelector('canvas')
+Ctx := bind(Canvas, :getContext)('2d')
+fn ctxCall(name, args...) bind(Ctx, name)(args...)
+
+// angle takes an angle in degrees, and returns radians
+fn angle(deg) deg / 180 * math.Pi
+
+// normAngle takes an angle in radians and returns an equivalent angle in the
+// range [0, 2 * math.Pi).
+fn normAngle(t)(t + 2 * math.Pi) % (2 * math.Pi)
+
+// squish is used to "rotate" the birds' geometries so they look like they're
+// facing some angle. It's not exact, but it's quite cheap and simple compared
+// to doing a full 3D projection and does the job.
+//
+// Note that we can't do a full 3D rotation because burds are 2D and rotating
+// them to 90deg would make them a zero-width line.
+fn squish(point, center, t) {
+	[x, y] := point
+	[cx, cy] := center
+	[
+		cx + (x - cx) * cos(t)
+		cy + (y - cy) * (1 + 0.9 * math.abs(sin(t)))
+	]
+}
+
+// line takes two points and draws a line between them
+fn line(start, end) {
+	ctxCall(:beginPath)
+	ctxCall(:moveTo, start.0, start.1)
+	ctxCall(:lineTo, end.0, end.1)
+	ctxCall(:stroke)
+}
+
+// ellipse draws a filled ellipse with no rotation
+fn ellipse(center, rx, ry) {
+	ctxCall(:beginPath)
+	ctxCall(:ellipse, center.0, center.1, rx, ry, 0, 0, 2 * math.Pi)
+	ctxCall(:fill)
+}
+
+// arcBetween draws an arc connected between two points, with a specified
+// radius. dir must be :clock or :counterclock. mode can be :stroke or :fill.
+//
+// arcBetween is more suitable for our purposes than the HTML Canvas's built-in
+// CanvasContext2D.arcTo() method in that this avoids the large-radius issue
+// (https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/arcTo#result_of_a_large_radius).
+//
+// Center-finding algorithm based on:
+// https://math.stackexchange.com/questions/27535/how-to-find-center-of-an-arc-given-start-point-end-point-radius-and-arc-direc
+fn arcBetween(start, end, radius, dir, mode) {
+	epsilon := if dir {
+		:counterclock -> 1
+		:clock -> -1
+	}
+	dist := math.hypot(start.0, start.1, end.0, end.1)
+	arcdist := math.sqrt(radius * radius - dist * dist / 4)
+	u := (end.0 - start.0) / dist
+	v := (end.1 - start.1) / dist
+	cx := (start.0 + end.0) / 2 - epsilon * arcdist * v
+	cy := (start.1 + end.1) / 2 + epsilon * arcdist * u
+
+	startAngle := math.orient(cx, cy, start.0, start.1)
+	endAngle := math.orient(cx, cy, end.0, end.1)
+
+	ctxCall(:beginPath)
+	if dir {
+		:counterclock -> ctxCall(:arc, cx, cy, radius, startAngle, endAngle)
+		:clock -> ctxCall(:arc, cx, cy, radius, endAngle, startAngle)
+	}
+	ctxCall(mode)
+}
+
+fn drawFootprint(fp) {
+	Scale := fp.y / DrawHeight * MaxScale
+	FpRadius := 1 * Scale
+	legSpan := 1.5 * Scale
+
+	ellipse([fp.x + legSpan, fp.y], FpRadius, FpRadius / 2)
+	ellipse([fp.x - legSpan, fp.y], FpRadius, FpRadius / 2)
+}
+
+fn drawShadow(burd) {
+	{
+		x: x
+		y: y
+		z: z
+		direction: dir
+	} := burd
+
+	Scale := y / DrawHeight * MaxScale
+	shadowRadiusX := 4 * Scale * (1 + 0.5 * math.abs(cos(dir)))
+	shadowRadiusY := 2 * Scale
+
+	ellipse([x, y - z], shadowRadiusX, shadowRadiusY)
+}
+
+fn drawBurd(burd) {
+	{
+		x: x
+		y: y
+		z: z
+		direction: dir
+		color: color
+	} := burd
+
+	Scale := math.scale(y, 0, DrawHeight, 0.1, 1) * MaxScale
+
+	facing := if {
+		dir < angle(70)
+		dir > angle(360 - 70) -> :east
+		dir < angle(180 - 70) -> :north
+		dir < angle(180 + 70) -> :west
+		_ -> :south
+	}
+
+	legSpan := 1.5 * Scale
+	legLength := 6 * Scale
+	bodyCenter := [
+		x + if facing {
+			:east -> -1 * Scale
+			:west -> 1 * Scale
+			_ -> 0
+		}
+		y - 11 * Scale
+	]
+	bodyHalfLength := 8 * Scale
+	attitude := angle(30)
+	headPoint := math.bearing(bodyCenter.0, bodyCenter.1, bodyHalfLength, attitude) |> squish(bodyCenter, dir)
+	tailPoint := math.bearing(bodyCenter.0, bodyCenter.1, bodyHalfLength, attitude + math.Pi) |> squish(bodyCenter, dir)
+	headLength := 8 * Scale
+	headAtt := if facing {
+		:east -> angle(-30)
+		:west -> angle(180 + 30)
+		_ -> if {
+			dir < angle(90)
+			dir > angle(270) -> angle(-10)
+			_ -> angle(180 + 10)
+		}
+	}
+	headEnd := math.bearing(headPoint.0, headPoint.1, headLength, headAtt)
+	roundBellyRadius := 8.75 * Scale
+	flatBellyRadius := 25 * Scale
+	midBellyRadius := 10.5 * Scale
+	[clockBodyRadius, counterclockBodyRadius] := if facing {
+		:east -> [flatBellyRadius, roundBellyRadius]
+		:west -> [roundBellyRadius, flatBellyRadius]
+		_ -> [midBellyRadius, midBellyRadius]
+	}
+
+	:legs, {
+		Ctx.lineWidth := Scale / 2
+		line([x + legSpan, y], [x + legSpan, y - legLength])
+		line([x - legSpan, y], [x - legSpan, y - legLength])
+	}
+
+	:body, {
+		Ctx.fillStyle := color
+		arcBetween(headPoint, tailPoint, clockBodyRadius, :clock, :fill)
+		arcBetween(headPoint, tailPoint, counterclockBodyRadius, :counterclock, :fill)
+		arcBetween(headPoint, tailPoint, clockBodyRadius, :clock, :stroke)
+		arcBetween(headPoint, tailPoint, counterclockBodyRadius, :counterclock, :stroke)
+	}
+
+	:head, {
+		line(headPoint, headEnd)
+	}
+}
+
+fn midJumpBurd(burd) {
+	{
+		x: x
+		y: y
+		direction: dir
+		jumped: jumped
+		color: color
+	} := burd
+
+	Scale := y / DrawHeight * MaxScale
+
+	t := time() |> math.scale(jumped, jumped + JumpDuration)
+	[destX, destY] := math.bearing(x, y, JumpDistance * Scale, dir)
+
+	c := 4 * JumpHeight * Scale / JumpDuration / JumpDuration
+	jumpY := c * t * (t - 1)
+
+	// x moves linearly, y moves parabolically
+	movingX := t |> math.scale(0, 1, x, destX)
+	movingY := t |> math.scale(0, 1, y, destY) + jumpY
+
+	{
+		x: movingX
+		y: movingY
+		z: jumpY
+		direction: dir
+		color: color
+	}
+}
+
+// main draw call, called every frame
+fn draw {
+	// get a fresh canvas
+	ctxCall(:setTransform, DPI, 0, 0, DPI, 0, 0)
+	ctxCall(:clearRect, 0, 0, Canvas.width, Canvas.height)
+
+	// general canvas config
+	Ctx.lineCap := 'round'
+	Ctx.lineJoin := 'round'
+	Ctx.strokeStyle := '#000000'
+
+	// setup for footprints
+	Ctx.fillStyle := '#cccccc'
+	Footprints |> with each() fn(fp) {
+		drawFootprint(fp)
+	}
+
+	// to render burds, first we need to compute their true (x, y) if they are
+	// mid-jump.
+	JumpedBurds := Burds |> map(fn(burd) if burd.jumped {
+		? -> burd
+		_ -> midJumpBurd(burd)
+	})
+
+	// render burds and their shadows. We first draw all shadows, then all
+	// burds, so shadows do not occlude burds.
+	Ctx.fillStyle := 'rgba(0, 0, 0, 0.2)' // shadows are all one color
+	JumpedBurds |> each(drawShadow)
+	// we want to sort them by their "closeness" to the viewer, not their Y.
+	// Closeness is the y of the shadow, or y - z (z being the jump height).
+	JumpedBurds |> sort.sort(fn(b) b.y - b.z) |> each(drawBurd)
+}
+
+// handleResize resets and re-renders the canvas when something about the
+// screen changes.
+fn handleResize {
+	DrawWidth <- window.innerWidth
+	DrawHeight <- window.innerHeight
+
+	Canvas.width := int(DrawWidth * DPI)
+	Canvas.height := int(DrawHeight * DPI)
+	Canvas.style.width := string(DrawWidth) + 'px'
+	Canvas.style.height := string(DrawHeight) + 'px'
+
+	draw()
+}
+
+// initial simulation state
+BurdPopulation := math.min(50, DrawWidth * DrawHeight / 50000) // max 50 burds, for perf/visual clutter
+Burds := range(BurdPopulation) |> map(fn(n) {
+	// x and y denote their pixel position on the canvas
+	x: random.number(5, DrawWidth - 5)
+	y: random.number(5, DrawHeight - 5)
+	// z is the vertical distance between a burd and its shadow, so named
+	// because conceptually it's the "z" distancae of a burd from the "ground".
+	z: 0
+	// the direction the burd is facing, in radians
+	direction: random.number(0, 2 * math.Pi)
+	color: random.choice([
+		'#000000'
+		'#f0eff1'
+	])
+})
+Footprints := []
+
+// jumpRandomBurd picks a random burd that's not mid-jump and starts its jump
+// by setting its burd.jumped timstamp.
+fn jumpRandomBurd {
+	if ? != burd := random.choice(Burds |> filter(fn(b) b.jumped = ?)) -> {
+		burd.jumped := time()
+
+		// add its old footprint (from where it jumps) to the footprints list
+		Footprints << { x: burd.x, y: burd.y }
+		MaxFootprints := int(BurdPopulation * FootprintTrail)
+		if len(Footprints) > MaxFootprints -> {
+			Footprints <- Footprints |> slice(len(Footprints) - MaxFootprints)
+		}
+
+		// when the jump is done, schedule a task to move its (x, y) to its
+		// destination coordinates post-jump.
+		with wait(JumpDuration) fn {
+			Scale := burd.y / DrawHeight * MaxScale
+			[x, y] := math.bearing(burd.x, burd.y, JumpDistance * Scale, burd.direction)
+
+			// we never want burds to completely leave the screen, so that there's
+			// a roughly constant density of burds on screen over time.  To do
+			// this, we direct the burds towards the center of the canvas when
+			// burds are about to leave (within 50px of the canvas bounds).
+			direction := if {
+				x < 50, x > DrawWidth - 50
+				y < 50, y > DrawHeight - 50 -> math.orient(x, -y, DrawWidth / 2, -DrawHeight / 2)
+				_ -> burd.direction + random.number(angle(-30), angle(30))
+			} |> normAngle()
+
+			burd |> merge({
+				x: x
+				y: y
+				direction: direction
+				jumped: ?
+			})
+		}
+	}
+}
+
+fn startDrawing {
+	draw()
+	requestAnimationFrame(startDrawing)
+}
+
+fn startJumping {
+	with wait(1 / BurdPopulation) fn {
+		jumpRandomBurd()
+		startJumping()
+	}
+}
+
+// main
+handleResize()
+window |> addHandler(:resize, handleResize)
+
+startDrawing()
+startJumping()
+
