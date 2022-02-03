@@ -29,11 +29,12 @@ body::after {
 #attribution {
 	font-family: system-ui, sans-serif;
 	position: absolute;
+	width: calc(100% - 32px);
 	color: #333;
 	top: 50%;
 	left: 50%;
 	text-align: center;
-	transform: translate(-50%, -50%) perspective(840px) rotateX(45deg);
+	transform: translate(-50%, -50%) perspective(600px) translateZ(-50px) scale(1.2) rotateX(45deg);
 }
 #attribution p {
 	margin: 8px;
@@ -42,15 +43,14 @@ body::after {
 	color: inherit;
 }
 #attribution a:hover {
-	color: #777;
+	color: #888;
 }
 </style>
 <div id="attribution">
 	<p><strong>burds!</strong></p>
-	<p>web experiment by <a href="https://thesephist.com/">Linus</a></p>
-	<p>inspiration by <a href="https://twitter.com/LoekVugs/status/1488140798671663104">Loek Vugs</a></p>
+	<p>web experiment by <a href="https://thesephist.com/" target="_blank">Linus</a></p>
+	<p>inspiration from <a href="https://twitter.com/LoekVugs/status/1488140798671663104" target="_blank">Loek Vugs</a></p>
 	<p><a href="https://github.com/thesephist/burds">open source on GitHub</a></p>
 </div>
-<canvas id="shadow" style="width:0;height:0"></canvas>
-<canvas id="main" style="width:0;height:0"></canvas>
+<canvas style="width:0;height:0"></canvas>
 <script src="/bundle.js"></script>
