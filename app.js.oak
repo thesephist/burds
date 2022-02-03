@@ -283,8 +283,11 @@ fn handleResize {
 	draw()
 }
 
-// initial simulation state
-BurdPopulation := math.min(50, DrawWidth * DrawHeight / 50000) // max 50 burds, for perf/visual clutter
+// initial simulation states
+BurdPopulation := (DrawWidth * DrawHeight / 50000) |>
+	// min 6, max 50 burds, for perf/visual clutter
+	math.min(50) |>
+	math.max(6)
 Burds := range(BurdPopulation) |> map(fn(n) {
 	// x and y denote their pixel position on the canvas
 	x: random.number(5, DrawWidth - 5)
