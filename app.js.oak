@@ -206,6 +206,12 @@ fn drawBurd(burd) {
 	}
 }
 
+// midJumpBurd maps a burd with a jump time to a burd with its x, y, z adjusted
+// to reflect its actual mid-jump position. For burds that are in the process
+// of jumping, midJumpBurd is called each frame to compute its position
+// mid-jump rather than updating its actual properties every frame. This helps
+// keep the burd's state functional, flowing from a single source of truth,
+// which is the jump time (burd.jumped).
 fn midJumpBurd(burd) {
 	{
 		x: x
@@ -220,11 +226,15 @@ fn midJumpBurd(burd) {
 	t := time() |> math.scale(jumped, jumped + JumpDuration)
 	[destX, destY] := math.bearing(x, y, JumpDistance * Scale, dir)
 
+	// the jump height (parabolic component of the burd's motion) is computed
+	// by a parabolic function based on the jump distance and its progress
+	// through that parabola.
 	c := 4 * JumpHeight * Scale / JumpDuration / JumpDuration
 	jumpY := c * t * (t - 1)
 
-	// x moves linearly, y moves parabolically
+	// x moves linearly
 	movingX := t |> math.scale(0, 1, x, destX)
+	// y has a linear component and a parabolic component
 	movingY := t |> math.scale(0, 1, y, destY) + jumpY
 
 	{
@@ -258,8 +268,8 @@ fn draw {
 		_ -> midJumpBurd(burd)
 	})
 
-	// render burds and their shadows. We first draw all shadows, then all
-	// burds, so shadows do not occlude burds.
+	// We first draw all shadows, then all burds, so shadows do not occlude
+	// burds.
 	Ctx.fillStyle := 'rgba(0, 0, 0, 0.2)' // shadows are all one color
 	JumpedBurds |> each(drawShadow)
 	// we want to sort them by their "closeness" to the viewer, not their Y.
@@ -268,7 +278,7 @@ fn draw {
 }
 
 // handleResize resets and re-renders the canvas when something about the
-// screen changes.
+// window viewport geometry changes.
 fn handleResize {
 	DrawWidth <- window.innerWidth
 	DrawHeight <- window.innerHeight
@@ -283,7 +293,7 @@ fn handleResize {
 
 // initial simulation states
 BurdPopulation := (DrawWidth * DrawHeight / 50000) |>
-	// min 6, max 50 burds, for perf/visual clutter
+	// min 6, max 50 burds, for perf/visual clutter balance
 	math.min(50) |>
 	math.max(6)
 Burds := range(BurdPopulation) |> map(fn(n) {
@@ -341,11 +351,15 @@ fn jumpRandomBurd {
 	}
 }
 
+// draw every frame
 fn startDrawing {
 	draw()
 	requestAnimationFrame(startDrawing)
 }
 
+// jump every N seconds, where N is determined by the total number of burds, so
+// burds on average jump pretty frequently. 1 is a magic number here determined
+// by trial and error.
 fn startJumping {
 	with wait(1 / BurdPopulation) fn {
 		jumpRandomBurd()
@@ -359,7 +373,6 @@ window |> addHandler(:resize, handleResize)
 querySelector('.hideButton') |> with addHandler(:click) fn {
 	querySelector('#attribution').style.display := 'none'
 }
-
 startDrawing()
 startJumping()
 
