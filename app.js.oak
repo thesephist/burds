@@ -249,9 +249,7 @@ fn draw {
 
 	// setup for footprints
 	Ctx.fillStyle := '#cccccc'
-	Footprints |> with each() fn(fp) {
-		drawFootprint(fp)
-	}
+	Footprints |> each(drawFootprint)
 
 	// to render burds, first we need to compute their true (x, y) if they are
 	// mid-jump.
@@ -358,6 +356,9 @@ fn startJumping {
 // main
 handleResize()
 window |> addHandler(:resize, handleResize)
+querySelector('.hideButton') |> with addHandler(:click) fn {
+	querySelector('#attribution').style.display := 'none'
+}
 
 startDrawing()
 startJumping()

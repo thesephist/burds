@@ -30,7 +30,7 @@ body::after {
 	font-family: system-ui, sans-serif;
 	position: absolute;
 	width: calc(100% - 32px);
-	color: #333;
+	color: #555;
 	top: 50%;
 	left: 50%;
 	text-align: center;
@@ -45,12 +45,25 @@ body::after {
 #attribution a:hover {
 	color: #888;
 }
+button.hideButton {
+	display: inline;
+	background: none;
+	color: #999;
+	cursor: pointer;
+	border: 0;
+	text-decoration: underline;
+	font-size: calc(1em - 4px);
+}
+button.hideButton:hover {
+	color: #aaa;
+}
 </style>
 <div id="attribution">
 	<p><strong>burds!</strong></p>
 	<p>web experiment by <a href="https://thesephist.com/" target="_blank">Linus</a></p>
 	<p>inspiration from <a href="https://twitter.com/LoekVugs/status/1488140798671663104" target="_blank">Loek Vugs</a></p>
 	<p><a href="https://github.com/thesephist/burds">open source on GitHub</a></p>
+	<button class="hideButton">hide this</button>
 </div>
 <canvas style="width:0;height:0"></canvas>
 <script src="/bundle.js"></script>
