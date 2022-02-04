@@ -2,6 +2,8 @@
 
 Just some burds.
 
+![Screenshot of burds](/img/screenshot-full.jpg)
+
 ## Development
 
 To autoformat the source file:
