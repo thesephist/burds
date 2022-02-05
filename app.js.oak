@@ -165,8 +165,8 @@ fn drawBurd(burd) {
 	]
 	bodyHalfLength := 8 * Scale
 	attitude := angle(30)
-	headPoint := math.bearing(bodyCenter.0, bodyCenter.1, bodyHalfLength, attitude) |> squish(bodyCenter, dir)
-	tailPoint := math.bearing(bodyCenter.0, bodyCenter.1, bodyHalfLength, attitude + math.Pi) |> squish(bodyCenter, dir)
+	headPoint := math.bearing(bodyCenter.0, bodyCenter.1, bodyHalfLength, -attitude) |> squish(bodyCenter, dir)
+	tailPoint := math.bearing(bodyCenter.0, bodyCenter.1, bodyHalfLength, -attitude + math.Pi) |> squish(bodyCenter, dir)
 	headLength := 8 * Scale
 	headAtt := if facing {
 		:east -> angle(-30)
@@ -177,7 +177,7 @@ fn drawBurd(burd) {
 			_ -> angle(180 + 10)
 		}
 	}
-	headEnd := math.bearing(headPoint.0, headPoint.1, headLength, headAtt)
+	headEnd := math.bearing(headPoint.0, headPoint.1, headLength, -headAtt)
 	roundBellyRadius := 8.75 * Scale
 	flatBellyRadius := 25 * Scale
 	midBellyRadius := 10.5 * Scale
@@ -224,7 +224,7 @@ fn midJumpBurd(burd) {
 	Scale := y / DrawHeight * MaxScale
 
 	t := time() |> math.scale(jumped, jumped + JumpDuration)
-	[destX, destY] := math.bearing(x, y, JumpDistance * Scale, dir)
+	[destX, destY] := math.bearing(x, y, JumpDistance * Scale, -dir)
 
 	// the jump height (parabolic component of the burd's motion) is computed
 	// by a parabolic function based on the jump distance and its progress
@@ -329,7 +329,7 @@ fn jumpRandomBurd {
 		// destination coordinates post-jump.
 		with wait(JumpDuration) fn {
 			Scale := burd.y / DrawHeight * MaxScale
-			[x, y] := math.bearing(burd.x, burd.y, JumpDistance * Scale, burd.direction)
+			[x, y] := math.bearing(burd.x, burd.y, JumpDistance * Scale, -burd.direction)
 
 			// we never want burds to completely leave the screen, so that there's
 			// a roughly constant density of burds on screen over time.  To do
