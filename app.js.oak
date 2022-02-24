@@ -32,14 +32,9 @@ FootprintTrail := 8
 DrawWidth := window.innerWidth
 DrawHeight := window.innerHeight
 
-// DOM bindings
-querySelector := bind(document, :querySelector)
-fn addHandler(el, name, handler) bind(el, :addEventListener)(string(name), handler)
-
 // Canvas bindings
-Canvas := querySelector('canvas')
-Ctx := bind(Canvas, :getContext)('2d')
-fn ctxCall(name, args...) bind(Ctx, name)(args...)
+Canvas := document.querySelector('canvas')
+Ctx := Canvas.getContext('2d')
 
 // angle takes an angle in degrees, and returns radians
 fn angle(deg) deg / 180 * math.Pi
@@ -65,17 +60,17 @@ fn squish(point, center, t) {
 
 // line takes two points and draws a line between them
 fn line(start, end) {
-	ctxCall(:beginPath)
-	ctxCall(:moveTo, start.0, start.1)
-	ctxCall(:lineTo, end.0, end.1)
-	ctxCall(:stroke)
+	Ctx.beginPath()
+	Ctx.moveTo(start.0, start.1)
+	Ctx.lineTo(end.0, end.1)
+	Ctx.stroke()
 }
 
 // ellipse draws a filled ellipse with no rotation
 fn ellipse(center, rx, ry) {
-	ctxCall(:beginPath)
-	ctxCall(:ellipse, center.0, center.1, rx, ry, 0, 0, 2 * math.Pi)
-	ctxCall(:fill)
+	Ctx.beginPath()
+	Ctx.ellipse(center.0, center.1, rx, ry, 0, 0, 2 * math.Pi)
+	Ctx.fill()
 }
 
 // arcBetween draws an arc connected between two points, with a specified
@@ -102,12 +97,15 @@ fn arcBetween(start, end, radius, dir, mode) {
 	startAngle := math.orient(cx, cy, start.0, start.1)
 	endAngle := math.orient(cx, cy, end.0, end.1)
 
-	ctxCall(:beginPath)
+	Ctx.beginPath()
 	if dir {
-		:counterclock -> ctxCall(:arc, cx, cy, radius, startAngle, endAngle)
-		:clock -> ctxCall(:arc, cx, cy, radius, endAngle, startAngle)
+		:counterclock -> Ctx.arc(cx, cy, radius, startAngle, endAngle)
+		:clock -> Ctx.arc(cx, cy, radius, endAngle, startAngle)
 	}
-	ctxCall(mode)
+	if mode {
+		:fill -> Ctx.fill()
+		:stroke -> Ctx.stroke()
+	}
 }
 
 fn drawFootprint(fp) {
@@ -249,8 +247,8 @@ fn midJumpBurd(burd) {
 // main draw call, called every frame
 fn draw {
 	// get a fresh canvas
-	ctxCall(:setTransform, DPI, 0, 0, DPI, 0, 0)
-	ctxCall(:clearRect, 0, 0, Canvas.width, Canvas.height)
+	Ctx.setTransform(DPI, 0, 0, DPI, 0, 0)
+	Ctx.clearRect(0, 0, Canvas.width, Canvas.height)
 
 	// general canvas config
 	Ctx.lineCap := 'round'
@@ -369,9 +367,9 @@ fn startJumping {
 
 // main
 handleResize()
-window |> addHandler(:resize, handleResize)
-querySelector('.hideButton') |> with addHandler(:click) fn {
-	querySelector('#attribution').style.display := 'none'
+window.addEventListener('resize', handleResize)
+with document.querySelector('.hideButton').addEventListener('click') fn {
+	document.querySelector('#attribution').style.display := 'none'
 }
 startDrawing()
 startJumping()
