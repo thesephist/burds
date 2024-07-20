@@ -24,6 +24,9 @@ body {
 	overflow: hidden;
 	background: #f0eff1;
 }
+
+
+
 canvas {
 	position: absolute;
 	top: 0;
@@ -70,6 +73,29 @@ button.hideButton {
 }
 button.hideButton:hover {
 	color: #aaa;
+}
+
+/* Quick and dirty dark theme */
+@media (prefers-color-scheme: dark) {
+	body {
+		background: #242324;
+	}
+	body::after {
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0) 50%);
+	}
+	#attribution {
+		color: #cacaca;
+	}
+}
+
+body.dark {
+	background: #242324;
+}
+body.dark::after {
+	background: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0) 50%);
+}
+body.dark #attribution {
+	color: #999;
 }
 </style>
 <div id="attribution">
